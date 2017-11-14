@@ -51,6 +51,7 @@ type userConfig struct {
 	MinTLS		string	`json:"min_TLS_ver"`
 	Timeout		int64	`json:"timeout"`
 	AppLog		string	`json:"appLog"`
+	apFile		*os.File	// Accompanying file descriptor
 	NewFPFile	string	`json:"new_fingerprint_file"`
 	fpFile		*os.File	// Accompanying file descriptor
 	EventLog	string	`json:"eventLog"`
@@ -491,7 +492,11 @@ func forward(conn net.Conn, fingerprintDB map[string]map[string]map[string]map[s
 
 					// XXX This is to get around transparent proxies where this isn't already set.
 					// Will make this neater in future
-					proxyDest = destination
+
+					// Currently this will serve to only use SNS when there is no proxy setting
+					if len(proxyDest) == 0 {
+						proxyDest = destination
+					}
 
 
 					// Set the i pointer
@@ -609,6 +614,7 @@ func forward(conn net.Conn, fingerprintDB map[string]map[string]map[string]map[s
 				// Not on the blocklist - woo!
 				// XXX DO THIS!
 				log.Printf("%v is *not* on the blocklist.  Permitting\n", hostname)
+				fmt.Fprintf(globalConfig.eventFile, "{ \"timestamp\": \"%v\", \"event\": \"permit\", \"fingerprint_desc\": \"%v\", \"server_name\": \"%v\" }\n", t.Format(time.RFC3339), fingerprintName, hostname)
 			}
 
 		} else {
@@ -746,7 +752,7 @@ func main() {
 	//var reverseCfg = flag.String("reversecfg", "./reverse", "file storing reverse proxy config")
 	flag.Parse()
 
-	var appLog *os.File	// Alternative output for log.thing
+	//var appLog *os.File	// Alternative output for log.thing
 
 	// Open 'blocklist' file - bad bad hardcoded Lee XXX
 	f, err := os.Open(*blocklistFile)
@@ -817,11 +823,11 @@ func main() {
 	}
 
 	// Open event log and set as output
-	appLog, err = os.OpenFile(globalConfig.AppLog, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	globalConfig.apFile, err = os.OpenFile(globalConfig.AppLog, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
 	check(err)
-	defer appLog.Close()
+	defer globalConfig.apFile.Close()
 
-	log.SetOutput(appLog)
+	log.SetOutput(globalConfig.apFile)
 
 
 	// Open the file to write new fingerprints to
