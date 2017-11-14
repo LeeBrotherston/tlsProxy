@@ -1,0 +1,8 @@
+{
+	"min_client_TLS_ver"	: "0x0302",
+	"timeout"				: 10000000000,
+	"appLog"				: "./tlsproxy.log",
+	"new_fingerprint_file"	: "./newfp.json",
+	"eventLog"				: "./events.json"
+
+}
