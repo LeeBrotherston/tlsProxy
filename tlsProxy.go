@@ -96,6 +96,7 @@ type fingerprint struct {
 type fingerprintOutput struct {
 	fingerprintName string // The human readable name for the fingerprint, intended for log output, etc
 	hostname        []byte // Destination hostname as taken from the SNI
+	destination     []byte
 }
 
 // G-G-G-G-GLOBAL VARS ..... probably bad.... whateevveeerrr
@@ -224,6 +225,7 @@ func deGrease(s []byte) (int, []byte) {
 
 // tlsFingerprint finds the fingerprint that is matched by the provided packet
 func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string) fingerprintOutput {
+	log.Printf("Started tlsFingerprint function")
 	var output fingerprintOutput
 	if buf[0] == 22 && buf[5] == 1 && buf[1] == 3 && buf[9] == 3 {
 		// This is the Lee acid test for is this a TLS client hello packet
@@ -358,15 +360,22 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 					log.Printf("Problem: Other internal servername pointer length incorrect %v %v\n", extLength, i)
 				}
 
-				hostnameLength := (uint16(buf[offset+i+5])<<8 + uint16(buf[offset+i+6]))
+				hostnameLength := uint16(buf[offset+i+5])<<8 + uint16(buf[offset+i+6])
 
-				//output.hostname := make([]byte, hostnameLength)
+				hostname := make([]byte, hostnameLength)
 
-				if hostnameLength != uint16(copy(output.hostname, buf[offset+i+7:offset+i+7+hostnameLength])) {
-					log.Printf("Problem: failed to copy hostname\n")
+				if hostnameLength != uint16(copy(hostname, buf[offset+i+7:offset+i+7+hostnameLength])) {
+					log.Printf("Problem: failed to copy hostname: %v - %v - %v\n", hostnameLength,
+						copy(hostname, buf[offset+i+7:offset+i+7+hostnameLength]),
+						hostname)
 				}
 
-				destination = string(output.hostname) + ":" + "443"
+				destination = string(hostname) + ":" + "443"
+
+				output.destination = []byte(destination)
+				output.hostname = hostname
+
+				log.Printf("Destination set to: %v", output.destination)
 
 				// XXX This is to get around transparent proxies where this isn't already set.
 				// Will make this neater in future
@@ -478,6 +487,7 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 		}
 
 	}
+	log.Printf("Ending tlsFingerprint function: %v", output)
 	return output
 }
 
@@ -486,13 +496,14 @@ func forward(conn net.Conn, fingerprintDB map[string]map[string]map[string]map[s
 
 	buf := make([]byte, 1024)
 	proxyDest := ""
-	destination := ""
+	var destination []byte
 	var chLen uint16
 
+	log.Printf("Starting forward function")
 	// Loop until the destination is determined, then connect to it
 	// XXX does not account for getting stuck in a shitty loop pre-connect
 	// Need to de-loop this
-	for destination == "" {
+	for len(destination) == 0 {
 		// Grab some data in the buffer
 		reqLen, err := conn.Read(buf)
 
@@ -522,7 +533,7 @@ func forward(conn net.Conn, fingerprintDB map[string]map[string]map[string]map[s
 			// Testing for a SOCKS proxy connection
 			// buf[0] == VERSION .. 0x5 is socks 5
 			// buf[1] == The length of auth types
-			//log.Printf("SOCKS5\n")
+			log.Printf("SOCKS5\n")
 
 			// Hey, we're developing, let's go for no auth for now
 			response := make([]byte, 2)
@@ -543,7 +554,7 @@ func forward(conn net.Conn, fingerprintDB map[string]map[string]map[string]map[s
 					proxyPort := int((uint64(buf[8]) * 256) + uint64(buf[9]))
 					proxyDest = string(proxyHost) + string(":") + strconv.Itoa(proxyPort)
 
-					//log.Printf("SOCKS5 IPv4 dest: %s : %v\n", proxyHost, proxyPort)
+					log.Printf("SOCKS5 IPv4 dest: %s : %v\n", proxyHost, proxyPort)
 
 					// Craft up a SOCKS response, which is almost the request
 					response := make([]byte, 10)
@@ -562,8 +573,8 @@ func forward(conn net.Conn, fingerprintDB map[string]map[string]map[string]map[s
 					proxyPort := int((uint64(buf[buf[4]+5]) * 256) + uint64(buf[buf[4]+6]))
 					proxyDest = string(proxyHost) + string(":") + strconv.Itoa(proxyPort)
 
-					//log.Printf("SOCKS5 FQDN: %s : %v\n", proxyHost, proxyPort)
-					//log.Printf("SOCKS5 DEBUG: %v %v\n", buf[buf[4]+5], buf[buf[4]+6])
+					log.Printf("SOCKS5 FQDN: %s : %v\n", proxyHost, proxyPort)
+					log.Printf("SOCKS5 DEBUG: %v %v\n", buf[buf[4]+5], buf[buf[4]+6])
 
 					// Craft a response
 					response := make([]byte, (7 + buf[4]))
@@ -581,7 +592,7 @@ func forward(conn net.Conn, fingerprintDB map[string]map[string]map[string]map[s
 				} else if buf[3] == 0x04 {
 					// IPv6
 					proxyHost := string(net.IP.String(buf[4:20]))
-					//log.Printf("SOCKS5 IPv6 dest: %s\n", proxyHost)
+					log.Printf("SOCKS5 IPv6 dest: %s\n", proxyHost)
 
 					proxyPort := int((uint64(buf[20]) * 256) + uint64(buf[21]))
 					proxyDest = "[" + string(proxyHost) + string("]:") + strconv.Itoa(proxyPort)
@@ -607,21 +618,24 @@ func forward(conn net.Conn, fingerprintDB map[string]map[string]map[string]map[s
 			}
 
 		} else if buf[0] == 22 && buf[5] == 1 && buf[1] == 3 && buf[9] == 3 {
-			fingerprintName := tlsFingerprint(buf, proxyDest, fingerprintDB)
+			log.Printf("About to call tlsFingerprint")
+			fingerprintOutput := tlsFingerprint(buf, proxyDest, fingerprintDB)
+			log.Printf("Fingerptintoutoutoutout: %v", fingerprintOutput)
+			destination = fingerprintOutput.destination
 			chLen = uint16(buf[3])<<8 + uint16(buf[4])
 			// Check if the host is in the blocklist or not...
 			t := time.Now()
-			hostname := string(strings.SplitN(destination, ":", 2)[0])
+			hostname := string(strings.SplitN(string(destination), ":", 2)[0])
 			_, ok := blocklist[hostname]
 			if ok == true {
 				log.Printf("%v is on the blocklist!  DROPPING!\n", hostname)
-				fmt.Fprintf(globalConfig.eventFile, "{ \"timestamp\": \"%v\", \"event\": \"block\", \"fingerprint_desc\": \"%v\", \"server_name\": \"%v\" }\n", t.Format(time.RFC3339), fingerprintName, hostname)
+				fmt.Fprintf(globalConfig.eventFile, "{ \"timestamp\": \"%v\", \"event\": \"block\", \"fingerprint_desc\": \"%v\", \"server_name\": \"%v\" }\n", t.Format(time.RFC3339), fingerprintOutput.fingerprintName, hostname)
 				conn.Close()
 			} else {
 				// Not on the blocklist - woo!
 				// XXX DO THIS!
 				log.Printf("%v is *not* on the blocklist.  Permitting\n", hostname)
-				fmt.Fprintf(globalConfig.eventFile, "{ \"timestamp\": \"%v\", \"event\": \"permit\", \"fingerprint_desc\": \"%v\", \"server_name\": \"%v\" }\n", t.Format(time.RFC3339), fingerprintName, hostname)
+				fmt.Fprintf(globalConfig.eventFile, "{ \"timestamp\": \"%v\", \"event\": \"permit\", \"fingerprint_desc\": \"%v\", \"server_name\": \"%v\" }\n", t.Format(time.RFC3339), fingerprintOutput.fingerprintName, hostname)
 			}
 
 		} else {
@@ -629,9 +643,10 @@ func forward(conn net.Conn, fingerprintDB map[string]map[string]map[string]map[s
 			//log.Printf("%s Disconnected\n", conn.RemoteAddr())
 			return
 		}
-
+		log.Printf("Say what? %v - %v", destination, proxyDest)
 	}
 
+	log.Printf("Time to connect?")
 	// OK Destination is determined, let's do some connecting!
 	client, err := net.DialTimeout("tcp", proxyDest, time.Duration(globalConfig.Timeout))
 
@@ -842,6 +857,7 @@ func main() {
 	defer globalConfig.eventFile.Close()
 
 	for {
+		log.Printf("Listener for loooooooop")
 		conn, err := listener.Accept()
 		if err != nil {
 			log.Fatalf("ERROR: failed to accept listener: %v", err)
