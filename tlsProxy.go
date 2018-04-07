@@ -462,6 +462,7 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 		}
 
 		fingerprintName, fpExist := fingerprintDB[hex.EncodeToString(thisFingerprint.recordTLSVersion)][hex.EncodeToString(thisFingerprint.TLSVersion)][hex.EncodeToString(thisFingerprint.ciphersuite)][hex.EncodeToString(thisFingerprint.compression)][UnpadStr(hex.EncodeToString(thisFingerprint.extensions))][hex.EncodeToString(thisFingerprint.eCurves)][hex.EncodeToString(thisFingerprint.sigAlg)][hex.EncodeToString(thisFingerprint.ecPointFmt)][bool(thisFingerprint.grease)]
+		output.fingerprintName = fingerprintName
 
 		if fpExist {
 			log.Printf("Client Fingerprint: %v\n", fingerprintName)
