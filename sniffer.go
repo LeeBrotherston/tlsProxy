@@ -48,10 +48,32 @@ func doSniff(device string, fingerprintDB map[string]map[string]map[string]map[s
 		event.SrcPort = uint16(tcp.SrcPort)
 		event.DstPort = uint16(tcp.DstPort)
 
-		log.Printf("Debug output: %+v %+v\n", event.SrcPort, event.DstPort)
+		event.IPVersion = src.EndpointType().String()
+
+		event.SNI = string(fingerprintOutput.hostname)
+
+		log.Printf("Debug output: %v\n", event)
 
 		// Some output....
 		log.Printf("%s -> %s : %s", src, dst, fingerprintOutput.fingerprintName)
 	}
 
 }
+
+//////
+// Event structs are used to express events via the API
+/*type Event struct {
+EventID    [32]string `json:"event_id"`
+Event      [16]string `json:"event"`
+FPHash     [64]string `json:"fp_hash"`
+//IPVersion  uint8      `json:"ip_version"`
+//IPv4Dst    [15]string `json:"ipv4_dst"`
+//IPv4Src    [15]string `json:"ipv4_src"`
+//IPv6Src    [39]string `json:"ipvt_src"`
+//IPv6Dst    [39]string `json:"ipvt_dst"`
+//SrcPort    uint16     `json:"src_port"`
+//DstPort    uint16     `json:"dst_port"`
+//TimeStamp  time.Time  `json:"timestamp"`
+//TLSVersion uint16     `json:"tls_version"`
+//SNI        []string   `json:"server_name"`
+*/
