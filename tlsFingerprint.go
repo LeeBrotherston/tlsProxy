@@ -9,7 +9,7 @@ import (
 
 // tlsFingerprint finds the fingerprint that is matched by the provided packet
 func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string) fingerprintOutput {
-	log.Printf("Started tlsFingerprint function")
+	//log.Printf("Started tlsFingerprint function")
 	var output fingerprintOutput
 	if buf[0] == 22 && buf[5] == 1 && buf[1] == 3 && buf[9] == 3 {
 		// This is the Lee acid test for is this a TLS client hello packet
@@ -32,15 +32,11 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 
 		thisFingerprint.recordTLSVersion = make([]byte, 2)
 		copy(thisFingerprint.recordTLSVersion, buf[1:3])
-		//thisFingerprint.recordTLSVersion[0] = buf[1]
-		//thisFingerprint.recordTLSVersion[1] = buf[2]
 
 		//chLen = uint16(buf[3])<<8 + uint16(buf[4])
 
 		thisFingerprint.TLSVersion = make([]byte, 2)
 		copy(thisFingerprint.TLSVersion, buf[9:11])
-		//thisFingerprint.TLSVersion[0] = buf[9]
-		//thisFingerprint.TLSVersion[1] = buf[10]
 
 		// Length of the session id changes to offset for the next bits
 		sessionIDLength = buf[43]
@@ -159,7 +155,7 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 				output.destination = []byte(destination)
 				output.hostname = hostname
 
-				log.Printf("Destination set to: %v", output.destination)
+				//log.Printf("Destination set to: %v", output.destination)
 
 				// XXX This is to get around transparent proxies where this isn't already set.
 				// Will make this neater in future
@@ -272,6 +268,6 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 		}
 
 	}
-	log.Printf("Ending tlsFingerprint function: %v", output)
+	//log.Printf("Ending tlsFingerprint function: %v", output)
 	return output
 }
