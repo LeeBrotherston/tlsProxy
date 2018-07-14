@@ -138,7 +138,7 @@ func forward(conn net.Conn, fingerprintDB map[string]map[string]map[string]map[s
 
 		} else if buf[0] == 22 && buf[5] == 1 && buf[1] == 3 && buf[9] == 3 {
 			log.Printf("About to call tlsFingerprint")
-			fingerprintOutput := tlsFingerprint(buf, proxyDest, fingerprintDB)
+			fingerprintOutput, _ := tlsFingerprint(buf, proxyDest, fingerprintDB)
 			log.Printf("Fingerptintoutoutoutout: %v", fingerprintOutput)
 			destination = fingerprintOutput.destination
 			chLen = uint16(buf[3])<<8 + uint16(buf[4])

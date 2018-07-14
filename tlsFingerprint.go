@@ -8,9 +8,10 @@ import (
 )
 
 // tlsFingerprint finds the fingerprint that is matched by the provided packet
-func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string) fingerprintOutput {
+func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string) (fingerprintOutput, fingerprint) {
 	//log.Printf("Started tlsFingerprint function")
 	var output fingerprintOutput
+	var thisFingerprint fingerprint
 	if buf[0] == 22 && buf[5] == 1 && buf[1] == 3 && buf[9] == 3 {
 		// This is the Lee acid test for is this a TLS client hello packet
 		// The "science" behind it is here:
@@ -23,7 +24,6 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 
 		// Sweet, looks like a client hello, let's do some pre-processing
 
-		var thisFingerprint fingerprint
 		var sessionIDLength byte
 		var ciphersuiteLength uint16
 		//var chLen uint16
@@ -35,8 +35,9 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 
 		//chLen = uint16(buf[3])<<8 + uint16(buf[4])
 
-		thisFingerprint.TLSVersion = make([]byte, 2)
-		copy(thisFingerprint.TLSVersion, buf[9:11])
+		//thisFingerprint.TLSVersion = make([]byte, 2)
+		//copy(thisFingerprint.TLSVersion, buf[9:11])
+		thisFingerprint.TLSVersion = buf[9:11]
 
 		// Length of the session id changes to offset for the next bits
 		sessionIDLength = buf[43]
@@ -269,5 +270,5 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 
 	}
 	//log.Printf("Ending tlsFingerprint function: %v", output)
-	return output
+	return output, thisFingerprint
 }

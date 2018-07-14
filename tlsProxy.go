@@ -51,17 +51,18 @@ var globalConfig userConfig
 
 // Event structs are used to express events via the API
 type Event struct {
-	EventID    [32]string `json:"event_id"`
-	Event      [16]string `json:"event"`
-	FPHash     [64]string `json:"fp_hash"`
-	IPVersion  string     `json:"ip_version"`
-	IPDst      string     `json:"ipv4_dst"`
-	IPSrc      string     `json:"ipv4_src"`
-	SrcPort    uint16     `json:"src_port"`
-	DstPort    uint16     `json:"dst_port"`
-	TimeStamp  time.Time  `json:"timestamp"`
-	TLSVersion uint16     `json:"tls_version"`
-	SNI        string     `json:"server_name"`
+	//EventID    [32]string `json:"event_id"`		// Generated serverside
+	Event      string    `json:"event"`
+	FPHash     string    `json:"fp_hash,omitempty"`
+	IPVersion  string    `json:"ip_version"`
+	IPDst      string    `json:"ipv4_dst"`
+	IPSrc      string    `json:"ipv4_src"`
+	SrcPort    uint16    `json:"src_port"`
+	DstPort    uint16    `json:"dst_port"`
+	TimeStamp  time.Time `json:"timestamp"`
+	TLSVersion uint16    `json:"tls_version"`
+	SNI        string    `json:"server_name"`
+	//Fingerprint fingerprint `json:"fingerprint,omitempty"`
 }
 
 // { "timestamp": "2016-08-09 15:09:08", "event": "fingerprint_match", "ip_version": "ipv6", "ipv6_src": "2607:fea8:705f:fd86::105a", "ipv6_dst": "2607:f8b0:400b:80b::2007", "src_port": 51948, "dst_port": 443, "tls_version": "TLSv1.2", "fingerprint_desc": "Chrome 51.0.2704.84 6", "server_name": "chatenabled.mail.google.com" }

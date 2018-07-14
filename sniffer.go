@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/binary"
+	"encoding/json"
 	"log"
 
 	"github.com/google/gopacket"
@@ -29,7 +31,7 @@ func doSniff(device string, fingerprintDB map[string]map[string]map[string]map[s
 
 		// Locate the payload to send the the tlsFingerprint() function
 		payload := packet.ApplicationLayer()
-		fingerprintOutput := tlsFingerprint(payload.Payload(), "", fingerprintDB)
+		fingerprintOutput, thatFingerprint := tlsFingerprint(payload.Payload(), "", fingerprintDB)
 
 		// Populate an event struct
 		var event Event
@@ -52,10 +54,17 @@ func doSniff(device string, fingerprintDB map[string]map[string]map[string]map[s
 
 		event.SNI = string(fingerprintOutput.hostname)
 
-		log.Printf("Debug output: %v\n", event)
+		event.Event = "log"
+
+		event.TLSVersion = binary.BigEndian.Uint16(thatFingerprint.TLSVersion)
+		//event.Fingerprint = thatFingerprint
+		//event.Fingerprint, _ = json.Marshal(thatFingerprint)
+		//log.Printf("Debug output: %+v\n", event)
+
+		jsonOut, _ := json.Marshal(event)
 
 		// Some output....
-		log.Printf("%s -> %s : %s", src, dst, fingerprintOutput.fingerprintName)
+		log.Printf("%s -> %s : %s : %s", src, dst, fingerprintOutput.fingerprintName, jsonOut)
 	}
 
 }
