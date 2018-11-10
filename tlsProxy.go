@@ -1,4 +1,5 @@
 /*
+
 Exciting Licence Info.....
 
 This file is part of tlsProxy.
@@ -30,10 +31,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"os"
+	"time"
 )
 
 // Fingerprints can totally be converted using jq -scM ''
@@ -41,12 +45,32 @@ import (
 
 // G-G-G-G-GLOBAL VARS ..... probably bad.... whateevveeerrr
 
+// Transport (pool) for connections to API
+var restClient *http.Client
+var developer bool
+
 // Global blocklist map (temp)
 var blocklist = map[string]bool{}
 
 // Global counter for new fingerprints
 var tempFPCounter int
 var globalConfig userConfig
+
+// Event structs are used to express events via the API
+type Event struct {
+	//EventID    [32]string `json:"event_id"`		// Generated serverside
+	Event     string    `json:"event"`
+	FPHash    string    `json:"fp_hash,omitempty"`
+	IPVersion string    `json:"ip_version"`
+	IPDst     string    `json:"ipv4_dst"`
+	IPSrc     string    `json:"ipv4_src"`
+	SrcPort   uint16    `json:"src_port"`
+	DstPort   uint16    `json:"dst_port"`
+	TimeStamp time.Time `json:"timestamp"`
+	//	TLSVersion  uint16    `json:"tls_version"`  // Part of the fingerprint, doesn't need to be stored here
+	SNI string `json:"server_name"`
+	//Fingerprint `json:"fingerprint,omitempty"`
+}
 
 // { "timestamp": "2016-08-09 15:09:08", "event": "fingerprint_match", "ip_version": "ipv6", "ipv6_src": "2607:fea8:705f:fd86::105a", "ipv6_dst": "2607:f8b0:400b:80b::2007", "src_port": 51948, "dst_port": 443, "tls_version": "TLSv1.2", "fingerprint_desc": "Chrome 51.0.2704.84 6", "server_name": "chatenabled.mail.google.com" }
 
@@ -58,9 +82,16 @@ func main() {
 	var config = flag.String("config", "./config.json", "location of config file")
 	var interfaceName = flag.String("interface", "", "Specify the interface")
 	var sniff = flag.Bool("sniff", false, "Set true to use sniffing mode (default proxy)")
+	//var developer = flag.Bool("developer", false, "Runs certain unsafe modes for dev purposes... DO NOT USE IN PROD")
+	//var servername = flag.String("server", "127.0.0.1", "Which server to connect to")
 	flag.Parse()
 
+	//print(murmur3.Sum128("arsearsearse"))
+
 	//var appLog *os.File	// Alternative output for log.thing
+
+	// Setup transport for connection to the server
+	restClient = createTransport()
 
 	// Open 'blocklist' file - bad bad hardcoded Lee XXX
 	f, err := os.Open(*blocklistFile)
@@ -96,11 +127,11 @@ func main() {
 	}
 
 	// Create the bare fingerprintDB map structure
-	fingerprintDB := make(map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string)
+	fingerprintDBNew := make(map[uint64]string)
 
 	// populate the fingerprintDB map
 	for k := range jsontype {
-		addPrint(jsontype[k], fingerprintDB)
+		addPrintNew(fpFiletoFP(jsontype[k]), fingerprintDBNew)
 	}
 
 	log.Printf("Loaded %v fingerprints\n", len(jsontype))
@@ -109,23 +140,38 @@ func main() {
 	// Open JSON file
 	fileConfig, err := ioutil.ReadFile(*config)
 	if err != nil {
-		log.Printf("Problem: File error opening config file: %v\n", err)
+		fmt.Printf("Problem: File error opening config file: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Parse that JSON file
 	err = json.Unmarshal(fileConfig, &globalConfig)
 	if err != nil {
-		log.Fatalf("JSON error: %v", err)
+		fmt.Printf("JSON error: %v", err)
 		os.Exit(1)
 	}
 
 	// Set temp FP counter past the number of FP's ... maybe ?!
 	tempFPCounter = int(len(jsontype)) + 1
 
+	// Open event log and set as output
+	globalConfig.apFile, err = os.OpenFile(globalConfig.AppLog, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	check(err)
+	defer globalConfig.apFile.Close()
+
+	// Open the file to write new fingerprints to
+	globalConfig.fpFile, err = os.OpenFile(globalConfig.NewFPFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	check(err)
+	defer globalConfig.fpFile.Close()
+
+	// Open the file to write event output
+	globalConfig.eventFile, err = os.OpenFile(globalConfig.EventLog, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	check(err)
+	defer globalConfig.eventFile.Close()
+
 	if *sniff == true {
 		// Interface set, let's sniff
-		doSniff(*interfaceName, fingerprintDB)
+		doSniff(*interfaceName, fingerprintDBNew)
 
 	} else {
 		// No interface set for sniffing, so we're listening
@@ -135,23 +181,6 @@ func main() {
 			os.Exit(1)
 		}
 
-		// Open event log and set as output
-		globalConfig.apFile, err = os.OpenFile(globalConfig.AppLog, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-		check(err)
-		defer globalConfig.apFile.Close()
-
-		log.SetOutput(globalConfig.apFile)
-
-		// Open the file to write new fingerprints to
-		globalConfig.fpFile, err = os.OpenFile(globalConfig.NewFPFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-		check(err)
-		defer globalConfig.fpFile.Close()
-
-		// Open the file to write event output
-		globalConfig.eventFile, err = os.OpenFile(globalConfig.EventLog, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-		check(err)
-		defer globalConfig.eventFile.Close()
-
 		for {
 			log.Printf("Listener for loooooooop")
 			conn, err := listener.Accept()
@@ -159,7 +188,7 @@ func main() {
 				log.Fatalf("ERROR: failed to accept listener: %v", err)
 				os.Exit(1)
 			}
-			go forward(conn, fingerprintDB)
+			go forward(conn, fingerprintDBNew)
 		}
 
 	}

@@ -1,16 +1,16 @@
 package main
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log"
 	"strconv"
 )
 
 // tlsFingerprint finds the fingerprint that is matched by the provided packet
-func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string) fingerprintOutput {
-	log.Printf("Started tlsFingerprint function")
+func tlsFingerprint(buf []byte, proxyDest string, fingerprintDBNew map[uint64]string) (fingerprintOutput, fingerprint) {
+	//log.Printf("Started tlsFingerprint function")
 	var output fingerprintOutput
+	var thisFingerprint fingerprint
 	if buf[0] == 22 && buf[5] == 1 && buf[1] == 3 && buf[9] == 3 {
 		// This is the Lee acid test for is this a TLS client hello packet
 		// The "science" behind it is here:
@@ -23,7 +23,6 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 
 		// Sweet, looks like a client hello, let's do some pre-processing
 
-		var thisFingerprint fingerprint
 		var sessionIDLength byte
 		var ciphersuiteLength uint16
 		//var chLen uint16
@@ -32,15 +31,12 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 
 		thisFingerprint.recordTLSVersion = make([]byte, 2)
 		copy(thisFingerprint.recordTLSVersion, buf[1:3])
-		//thisFingerprint.recordTLSVersion[0] = buf[1]
-		//thisFingerprint.recordTLSVersion[1] = buf[2]
 
 		//chLen = uint16(buf[3])<<8 + uint16(buf[4])
 
-		thisFingerprint.TLSVersion = make([]byte, 2)
-		copy(thisFingerprint.TLSVersion, buf[9:11])
-		//thisFingerprint.TLSVersion[0] = buf[9]
-		//thisFingerprint.TLSVersion[1] = buf[10]
+		//thisFingerprint.TLSVersion = make([]byte, 2)
+		//copy(thisFingerprint.TLSVersion, buf[9:11])
+		thisFingerprint.TLSVersion = buf[9:11]
 
 		// Length of the session id changes to offset for the next bits
 		sessionIDLength = buf[43]
@@ -92,7 +88,7 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 
 			// This is the extensionType again, but to add to the extensions var for fingerprinting
 			switch uint16(extensionType) {
-			// Lets not add grease the extension list....
+			// Lets not add grease to the extension list....
 			case 0x0A0A:
 			case 0x1A1A:
 			case 0x2A2A:
@@ -159,7 +155,7 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 				output.destination = []byte(destination)
 				output.hostname = hostname
 
-				log.Printf("Destination set to: %v", output.destination)
+				//log.Printf("Destination set to: %v", output.destination)
 
 				// XXX This is to get around transparent proxies where this isn't already set.
 				// Will make this neater in future
@@ -245,7 +241,7 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 
 		}
 
-		fingerprintName, fpExist := fingerprintDB[hex.EncodeToString(thisFingerprint.recordTLSVersion)][hex.EncodeToString(thisFingerprint.TLSVersion)][hex.EncodeToString(thisFingerprint.ciphersuite)][hex.EncodeToString(thisFingerprint.compression)][UnpadStr(hex.EncodeToString(thisFingerprint.extensions))][hex.EncodeToString(thisFingerprint.eCurves)][hex.EncodeToString(thisFingerprint.sigAlg)][hex.EncodeToString(thisFingerprint.ecPointFmt)][bool(thisFingerprint.grease)]
+		fingerprintName, fpExist := lookupFingerprint(thisFingerprint, fingerprintDBNew)
 		output.fingerprintName = fingerprintName
 
 		if fpExist {
@@ -254,7 +250,7 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 			// Add the fingerprint
 			tempFPCounter++
 			thisFingerprint.desc = "Temp fingerprint " + strconv.Itoa(tempFPCounter)
-			addPrintInt(thisFingerprint, fingerprintDB)
+			addPrintNew(thisFingerprint, fingerprintDBNew)
 
 			log.Printf("Unidentified client fingerprint.\n")
 
@@ -272,6 +268,6 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 		}
 
 	}
-	log.Printf("Ending tlsFingerprint function: %v", output)
-	return output
+	//log.Printf("Ending tlsFingerprint function: %v", output)
+	return output, thisFingerprint
 }

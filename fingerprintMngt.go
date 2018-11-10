@@ -1,85 +1,71 @@
 package main
 
-import "encoding/hex"
+import (
+	"fmt"
 
-// Adds a fingerprint (myPrint) to the fingerprint database (myDB)
-func addPrint(myPrint fingerprintFile, myDB map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string) bool {
-	if len(myDB[HexNormalise(string(myPrint.RecordTLSVersion))]) == 0 {
-		myDB[HexNormalise(string(myPrint.RecordTLSVersion))] = map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string{}
+	"github.com/spaolacci/murmur3"
+)
+
+// hashPrint generates the hash of the FP, to be used in the FP lookup tables
+func hashPrint(myPrint fingerprint) uint64 {
+	hasher := murmur3.New64()
+	// Throw the various values into the hashererererer
+	hasher.Write([]byte(myPrint.ciphersuite))
+	hasher.Write([]byte(myPrint.compression))
+	hasher.Write([]byte(myPrint.ecPointFmt))
+	hasher.Write([]byte(myPrint.eCurves))
+	hasher.Write([]byte(myPrint.extensions))
+	if myPrint.grease == true {
+		hasher.Write([]byte("true"))
+	} else {
+		hasher.Write([]byte("false"))
 	}
-
-	if len(myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))]) == 0 {
-		myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))] = map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string{}
-	}
-
-	if len(myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))]) == 0 {
-		myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))] = map[string]map[string]map[string]map[string]map[string]map[bool]string{}
-	}
-
-	if len(myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))][HexNormalise(string(myPrint.Compression))]) == 0 {
-		myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))][HexNormalise(string(myPrint.Compression))] = map[string]map[string]map[string]map[string]map[bool]string{}
-	}
-
-	if len(myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))][HexNormalise(string(myPrint.Compression))][HexNormalise(string(myPrint.Extensions))]) == 0 {
-		myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))][HexNormalise(string(myPrint.Compression))][HexNormalise(string(myPrint.Extensions))] = map[string]map[string]map[string]map[bool]string{}
-	}
-
-	if len(myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))][HexNormalise(string(myPrint.Compression))][HexNormalise(string(myPrint.Extensions))][HexNormalise(string(myPrint.ECurves))]) == 0 {
-		myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))][HexNormalise(string(myPrint.Compression))][HexNormalise(string(myPrint.Extensions))][HexNormalise(string(myPrint.ECurves))] = map[string]map[string]map[bool]string{}
-	}
-
-	if len(myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))][HexNormalise(string(myPrint.Compression))][HexNormalise(string(myPrint.Extensions))][HexNormalise(string(myPrint.ECurves))][HexNormalise(string(myPrint.SigAlg))]) == 0 {
-		myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))][HexNormalise(string(myPrint.Compression))][HexNormalise(string(myPrint.Extensions))][HexNormalise(string(myPrint.ECurves))][HexNormalise(string(myPrint.SigAlg))] = map[string]map[bool]string{}
-	}
-
-	if len(myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))][HexNormalise(string(myPrint.Compression))][HexNormalise(string(myPrint.Extensions))][HexNormalise(string(myPrint.ECurves))][HexNormalise(string(myPrint.SigAlg))][HexNormalise(string(myPrint.ECPointFmt))]) == 0 {
-		myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))][HexNormalise(string(myPrint.Compression))][HexNormalise(string(myPrint.Extensions))][HexNormalise(string(myPrint.ECurves))][HexNormalise(string(myPrint.SigAlg))][HexNormalise(string(myPrint.ECPointFmt))] = map[bool]string{}
-	}
-
-	if len(myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))][HexNormalise(string(myPrint.Compression))][HexNormalise(string(myPrint.Extensions))][HexNormalise(string(myPrint.ECurves))][HexNormalise(string(myPrint.SigAlg))][HexNormalise(string(myPrint.ECPointFmt))][myPrint.Grease]) == 0 {
-		myDB[HexNormalise(string(myPrint.RecordTLSVersion))][HexNormalise(string(myPrint.TLSVersion))][HexNormalise(string(myPrint.Ciphersuite))][HexNormalise(string(myPrint.Compression))][HexNormalise(string(myPrint.Extensions))][HexNormalise(string(myPrint.ECurves))][HexNormalise(string(myPrint.SigAlg))][HexNormalise(string(myPrint.ECPointFmt))][myPrint.Grease] = myPrint.Desc
-	}
-
-	return true
+	hasher.Write([]byte(myPrint.recordTLSVersion))
+	hasher.Write([]byte(myPrint.sigAlg))
+	hasher.Write([]byte(myPrint.TLSVersion))
+	myHash := hasher.Sum64()
+	return myHash
 }
 
-// Adds a fingerprint (myPrint) to the fingerprint database (myDB)
-func addPrintInt(myPrint fingerprint, myDB map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string) bool {
-	if len(myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))]) == 0 {
-		myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))] = map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string{}
+// fpFiletoFP is to convert between two similar, but not idential structs which I now want
+// to use them interchangably, because I'm a tool.
+func fpFiletoFP(myPrint fingerprintFile) fingerprint {
+	var output fingerprint
+
+	// Copy and convert the relevent fields
+	output.id = myPrint.ID
+	output.desc = myPrint.Desc
+	output.recordTLSVersion = hexStrToByteArray(myPrint.RecordTLSVersion)
+	output.TLSVersion = hexStrToByteArray(myPrint.TLSVersion)
+	output.ciphersuite = hexStrToByteArray(myPrint.Ciphersuite)
+	output.compression = hexStrToByteArray(myPrint.Compression)
+	output.extensions = hexStrToByteArray(myPrint.Extensions)
+	output.eCurves = hexStrToByteArray(myPrint.ECurves)
+	output.sigAlg = hexStrToByteArray(myPrint.SigAlg)
+	output.ecPointFmt = hexStrToByteArray(myPrint.ECPointFmt)
+	output.grease = myPrint.Grease
+
+	return output
+}
+
+// And now the hashed versions, whereby we do not actually need to store the FPs at all.
+func addPrintNew(myPrint fingerprint, myDB map[uint64]string) {
+	myHash := hashPrint(myPrint)
+	if _, ok := myDB[myHash]; ok {
+		fmt.Printf("Hash Collision: %v %s and %s\n", myHash, myDB[myHash], myPrint.desc)
+	} else {
+		myDB[myHash] = myPrint.desc
+		fmt.Printf("New FP Hash %v : %s\n", myHash, myPrint.desc)
 	}
 
-	if len(myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))]) == 0 {
-		myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))] = map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string{}
-	}
+}
 
-	if len(myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))]) == 0 {
-		myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))] = map[string]map[string]map[string]map[string]map[string]map[bool]string{}
+// lookupFingerprint is used to lookup the name of a fingerprint given the JSON representation
+func lookupFingerprint(myPrint fingerprint, myDB map[uint64]string) (string, bool) {
+	myHash := hashPrint(myPrint)
+	fmt.Printf("Looking up hash: %v\n", myHash)
+	if value, ok := myDB[myHash]; ok {
+		return value, true
 	}
-
-	if len(myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))][hex.EncodeToString([]byte(myPrint.compression))]) == 0 {
-		myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))][hex.EncodeToString([]byte(myPrint.compression))] = map[string]map[string]map[string]map[string]map[bool]string{}
-	}
-
-	if len(myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))][hex.EncodeToString([]byte(myPrint.compression))][hex.EncodeToString([]byte(myPrint.extensions))]) == 0 {
-		myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))][hex.EncodeToString([]byte(myPrint.compression))][hex.EncodeToString([]byte(myPrint.extensions))] = map[string]map[string]map[string]map[bool]string{}
-	}
-
-	if len(myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))][hex.EncodeToString([]byte(myPrint.compression))][hex.EncodeToString([]byte(myPrint.extensions))][hex.EncodeToString([]byte(myPrint.eCurves))]) == 0 {
-		myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))][hex.EncodeToString([]byte(myPrint.compression))][hex.EncodeToString([]byte(myPrint.extensions))][hex.EncodeToString([]byte(myPrint.eCurves))] = map[string]map[string]map[bool]string{}
-	}
-
-	if len(myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))][hex.EncodeToString([]byte(myPrint.compression))][hex.EncodeToString([]byte(myPrint.extensions))][hex.EncodeToString([]byte(myPrint.eCurves))][hex.EncodeToString([]byte(myPrint.sigAlg))]) == 0 {
-		myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))][hex.EncodeToString([]byte(myPrint.compression))][hex.EncodeToString([]byte(myPrint.extensions))][hex.EncodeToString([]byte(myPrint.eCurves))][hex.EncodeToString([]byte(myPrint.sigAlg))] = map[string]map[bool]string{}
-	}
-
-	if len(myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))][hex.EncodeToString([]byte(myPrint.compression))][hex.EncodeToString([]byte(myPrint.extensions))][hex.EncodeToString([]byte(myPrint.eCurves))][hex.EncodeToString([]byte(myPrint.sigAlg))][hex.EncodeToString([]byte(myPrint.ecPointFmt))]) == 0 {
-		myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))][hex.EncodeToString([]byte(myPrint.compression))][hex.EncodeToString([]byte(myPrint.extensions))][hex.EncodeToString([]byte(myPrint.eCurves))][hex.EncodeToString([]byte(myPrint.sigAlg))][hex.EncodeToString([]byte(myPrint.ecPointFmt))] = map[bool]string{}
-	}
-
-	if len(myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))][hex.EncodeToString([]byte(myPrint.compression))][hex.EncodeToString([]byte(myPrint.extensions))][hex.EncodeToString([]byte(myPrint.eCurves))][hex.EncodeToString([]byte(myPrint.sigAlg))][hex.EncodeToString([]byte(myPrint.ecPointFmt))][myPrint.grease]) == 0 {
-		myDB[hex.EncodeToString([]byte(myPrint.recordTLSVersion))][hex.EncodeToString([]byte(myPrint.TLSVersion))][hex.EncodeToString([]byte(myPrint.ciphersuite))][hex.EncodeToString([]byte(myPrint.compression))][hex.EncodeToString([]byte(myPrint.extensions))][hex.EncodeToString([]byte(myPrint.eCurves))][hex.EncodeToString([]byte(myPrint.sigAlg))][hex.EncodeToString([]byte(myPrint.ecPointFmt))][myPrint.grease] = myPrint.desc
-	}
-
-	return true
+	return "", false
 }

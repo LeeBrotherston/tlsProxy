@@ -6,22 +6,24 @@ import (
 	"strings"
 )
 
+// check is a (probably over) simple function to wrap errors that will always be fatal
 func check(e error) {
 	if e != nil {
 		panic(e)
 	}
 }
 
-// StrToByte is for converting 0x00 to byte slice
-func StrToByte(s string) []byte {
-	var output []byte
-	something := strings.Split(s, " ")
+// Take any number of formats (0x057843574835743, 0x00 0x01 0x00, 5847358943) in hex format,
+// and convert to a byte array.
+func hexStrToByteArray(s string) []byte {
+	// Remove all the '0x's
+	temp := strings.Replace(s, `0x`, ``, -1)
 
-	for arse, stuff := range something {
-		temp, _ := hex.DecodeString(strings.TrimLeft(stuff, "0x"))
-		output = append(output, temp[0])
-		fmt.Printf("%q\n", arse)
-	}
+	// Remove all the spaces
+	temp = strings.Replace(temp, ` `, ``, -1)
+
+	// Now it should just be a long hex value.  Which we can convert to a byte array
+	output, _ := hex.DecodeString(temp)
 
 	return output
 }
@@ -117,4 +119,10 @@ func deGrease(s []byte) (int, []byte) {
 		return greaseCount, greaseless
 	}
 	return 0, s
+}
+
+// hashFP is used to hash whole fingerprints into a single string based hash
+func hashFP() {
+	//something := "arse"
+	//thing := murmur3.Sum64(something)
 }
