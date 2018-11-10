@@ -1,14 +1,13 @@
 package main
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log"
 	"strconv"
 )
 
 // tlsFingerprint finds the fingerprint that is matched by the provided packet
-func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string) (fingerprintOutput, fingerprint) {
+func tlsFingerprint(buf []byte, proxyDest string, fingerprintDBNew map[uint64]string) (fingerprintOutput, fingerprint) {
 	//log.Printf("Started tlsFingerprint function")
 	var output fingerprintOutput
 	var thisFingerprint fingerprint
@@ -89,7 +88,7 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 
 			// This is the extensionType again, but to add to the extensions var for fingerprinting
 			switch uint16(extensionType) {
-			// Lets not add grease the extension list....
+			// Lets not add grease to the extension list....
 			case 0x0A0A:
 			case 0x1A1A:
 			case 0x2A2A:
@@ -242,7 +241,7 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 
 		}
 
-		fingerprintName, fpExist := fingerprintDB[hex.EncodeToString(thisFingerprint.recordTLSVersion)][hex.EncodeToString(thisFingerprint.TLSVersion)][hex.EncodeToString(thisFingerprint.ciphersuite)][hex.EncodeToString(thisFingerprint.compression)][UnpadStr(hex.EncodeToString(thisFingerprint.extensions))][hex.EncodeToString(thisFingerprint.eCurves)][hex.EncodeToString(thisFingerprint.sigAlg)][hex.EncodeToString(thisFingerprint.ecPointFmt)][bool(thisFingerprint.grease)]
+		fingerprintName, fpExist := lookupFingerprint(thisFingerprint, fingerprintDBNew)
 		output.fingerprintName = fingerprintName
 
 		if fpExist {
@@ -251,7 +250,7 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDB map[string]map[s
 			// Add the fingerprint
 			tempFPCounter++
 			thisFingerprint.desc = "Temp fingerprint " + strconv.Itoa(tempFPCounter)
-			addPrintInt(thisFingerprint, fingerprintDB)
+			addPrintNew(thisFingerprint, fingerprintDBNew)
 
 			log.Printf("Unidentified client fingerprint.\n")
 

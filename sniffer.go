@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"log"
 
@@ -10,7 +9,7 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-func doSniff(device string, fingerprintDB map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[bool]string) {
+func doSniff(device string, fingerprintDBNew map[uint64]string) {
 
 	// Open device
 	// the 0 and true refer to snaplen and promisc mode.  For now we always want these.
@@ -31,7 +30,7 @@ func doSniff(device string, fingerprintDB map[string]map[string]map[string]map[s
 
 		// Locate the payload to send the the tlsFingerprint() function
 		payload := packet.ApplicationLayer()
-		fingerprintOutput, thatFingerprint := tlsFingerprint(payload.Payload(), "", fingerprintDB)
+		fingerprintOutput, _ := tlsFingerprint(payload.Payload(), "", fingerprintDBNew)
 
 		// Populate an event struct
 		var event Event
@@ -55,11 +54,6 @@ func doSniff(device string, fingerprintDB map[string]map[string]map[string]map[s
 		event.SNI = string(fingerprintOutput.hostname)
 
 		event.Event = "log"
-
-		event.TLSVersion = binary.BigEndian.Uint16(thatFingerprint.TLSVersion)
-		//event.Fingerprint = thatFingerprint
-		//event.Fingerprint, _ = json.Marshal(thatFingerprint)
-		//log.Printf("Debug output: %+v\n", event)
 
 		jsonOut, _ := json.Marshal(event)
 
