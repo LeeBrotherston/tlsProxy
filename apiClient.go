@@ -1,8 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
-	"io"
+	"fmt"
 	"net/http"
 )
 
@@ -50,15 +51,22 @@ func createTransport() *http.Client {
 }
 
 // restPOST will be used to POST to the defined REST endpoint
-func restPOST(buf io.Reader) {
-	resp, err := restClient.Post("URL", "application/json", buf)
+func restPOST(endpoint string, buf []byte) {
+	fmt.Printf("restPOST called\n%v\n", buf)
+	resp, err := restClient.Post(endpoint, "application/json", bytes.NewBuffer(buf))
 	if err != nil {
+		if resp != nil {
+			fmt.Printf("Got a response\n")
+		} else {
+			fmt.Printf("No Response?\n")
+		}
 		return
 	}
 
-	if resp != nil {
-		print("Got a response")
-	}
+	fmt.Printf("restPOST error: %s\n", err)
+
+	return
+
 }
 
 // restGET will be used to GET from the defined REST endpoint
@@ -77,4 +85,11 @@ func restGET(client *http.Client) {
 		print(err)
 	}
 	print(resp.Body)
+}
+
+// APIWorker is go func that listens on a channel for new events to send to the API
+// this is a separate process to save other processes from having to wait for the
+// completion of API calls
+func APIWorker(event chan Event) {
+
 }

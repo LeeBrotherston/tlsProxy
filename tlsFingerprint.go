@@ -6,11 +6,22 @@ import (
 	"strconv"
 )
 
+// Check that lengths are not off the end of the packet, etc XXX TODO
+
 // tlsFingerprint finds the fingerprint that is matched by the provided packet
-func tlsFingerprint(buf []byte, proxyDest string, fingerprintDBNew map[uint64]string) (fingerprintOutput, fingerprint) {
-	//log.Printf("Started tlsFingerprint function")
+func tlsFingerprint(buf []byte, proxyDest string, fingerprintDBNew map[uint64]string) (fingerprintOutput, fingerprint, uint64) {
+
 	var output fingerprintOutput
 	var thisFingerprint fingerprint
+	packetLen := len(buf)
+	var fpHash uint64
+
+	// The minimum may be longer, but shorter than this is definitely a problem ;)
+	if packetLen < 47 {
+		// Handle an obscenely long packet here
+		invalidTLS("Packet too short!")
+	}
+
 	if buf[0] == 22 && buf[5] == 1 && buf[1] == 3 && buf[9] == 3 {
 		// This is the Lee acid test for is this a TLS client hello packet
 		// The "science" behind it is here:
@@ -46,18 +57,30 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDBNew map[uint64]st
 		ciphersuiteLength = uint16(buf[44+sessionIDLength]) << 8
 		ciphersuiteLength += uint16(buf[45+sessionIDLength])
 
+		// Check that this offset doesn't push any pointers past the end of the packet
+		// We do this by taking the current location (ciphersuite length field), adding
+		// the ciphersuite length value on, and seeing if this exceeds the total length
+		// of the packet being examined.
+		if int(ciphersuiteLength+uint16(45)+uint16(sessionIDLength)) > packetLen {
+			invalidTLS("ciphersuite length longer than total packet")
+		}
+
 		// OK let's get dem ciphersuites, yo...
 		tempCiphersuite := make([]byte, uint16(ciphersuiteLength))
 		if uint16(copy(tempCiphersuite, buf[(46+uint16(sessionIDLength)):(46+uint16(sessionIDLength)+ciphersuiteLength)])) != ciphersuiteLength {
 			log.Printf("Debug: Ciphersuite copy lengths seem wrong\n")
 		}
 
-		// Get degreasing info
+		// See if the packet contains any "grease" ciphersuites, which a) we wish to note
+		// and b) we wish to filter out as it will make fingerprints look different (potentially)
+		// as grease patterns are randomized by some clients.
 		shrinkBy, otherTempCiphersuite := deGrease(tempCiphersuite)
 		if shrinkBy > 0 {
 			thisFingerprint.grease = true
 		}
 
+		// Reconstruct the packet around the new ciphersuites if grease suites have been stripped out
+		// as this will alter the length, etc
 		greaseCiphersuiteLength := ciphersuiteLength - uint16(shrinkBy*2)
 		thisFingerprint.ciphersuite = make([]byte, uint16(greaseCiphersuiteLength))
 		copy(thisFingerprint.ciphersuite, otherTempCiphersuite)
@@ -65,6 +88,14 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDBNew map[uint64]st
 		// Let's take a lookie see at the compression settings, which are always the same ;)
 		var compressionMethodsLen byte
 		compressionMethodsLen = buf[46+uint16(sessionIDLength)+uint16(ciphersuiteLength)]
+
+		// Check that this offset doesn't push any pointers past the end of the packet
+		// We do this by taking the current location (compression length field), adding
+		// the compression length value on, and seeing if this exceeds the total length
+		// of the packet being examined.
+		if int(uint16(46)+uint16(sessionIDLength)+uint16(ciphersuiteLength)+uint16(compressionMethodsLen)) > packetLen {
+			invalidTLS("compression methods length longer than total packet")
+		}
 
 		// XXX move to using copy like ciphersuites
 		thisFingerprint.compression = make([]byte, uint16(compressionMethodsLen))
@@ -77,6 +108,14 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDBNew map[uint64]st
 		var extensionsLength uint16
 		extensionsLength = uint16(uint16(buf[47+uint16(sessionIDLength)+uint16(ciphersuiteLength)+uint16(compressionMethodsLen)]) << 8)
 		extensionsLength += uint16(buf[48+uint16(sessionIDLength)+uint16(ciphersuiteLength)+uint16(compressionMethodsLen)])
+
+		// Check that this offset doesn't push any pointers past the end of the packet
+		// We do this by taking the current location (extensions length field), adding
+		// the extensions length value on, and seeing if this exceeds the total length
+		// of the packet being examined.
+		if int(48+uint16(sessionIDLength)+uint16(ciphersuiteLength)+uint16(compressionMethodsLen)+extensionsLength) > packetLen {
+			invalidTLS("extensions section length longer than total packet")
+		}
 
 		offset := 49 + uint16(sessionIDLength) + uint16(ciphersuiteLength) + uint16(compressionMethodsLen)
 		for i = 0; i < extensionsLength; i++ {
@@ -106,16 +145,12 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDBNew map[uint64]st
 			case 0xEAEA:
 			case 0xFAFA:
 				thisFingerprint.grease = true
-			// Or padding.....
+			// Or padding, because it's padding.....
 			case 0x0015:
 			// But everything else is fine
 			default:
 				thisFingerprint.extensions = append(thisFingerprint.extensions, buf[offset+i], buf[offset+i+1])
 			}
-			//if extensionType != 0x0015 {
-			// Yay it's not padding
-			//	thisFingerprint.extensions = append(thisFingerprint.extensions, buf[offset+i], buf[offset+i+1])
-			//}
 
 			// Move counter to start of extension
 			i += 2
@@ -123,13 +158,20 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDBNew map[uint64]st
 			switch uint16(extensionType) {
 
 			case 0x0000:
-				// Server Name Indication (SNI) extension
+				// Server Name Indication (SNI) extension2
 				extLength := uint16(buf[offset+i])<<8 + uint16(buf[offset+i+1])
+				if int(offset+i+extLength) > packetLen {
+					// Check that this offset doesn't push any pointers past the end of the packet
+					// We do this by taking the current location, adding the extension's length
+					// value on, and seeing if this exceeds the total length of the packet being
+					//  examined.
+					invalidTLS("Extension length exceeds total packet length")
+				}
 
 				// Check internal length pointer
 				if (uint16(buf[offset+i+2])<<8 + uint16(buf[offset+i+3])) != (extLength - 2) {
 					log.Printf("Problem: Internal servername pointer length incorrect %v %v %v %v\n", extLength, i, buf[offset+i+2], buf[offset+i+3])
-					//log.Printf("Problematic PACKETDUMP >>>> %#x", buf)
+					invalidTLS("SNI length incorrect")
 				}
 				// Check this is "hostname" type
 				if buf[offset+i+4] != 0 {
@@ -155,11 +197,6 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDBNew map[uint64]st
 				output.destination = []byte(destination)
 				output.hostname = hostname
 
-				//log.Printf("Destination set to: %v", output.destination)
-
-				// XXX This is to get around transparent proxies where this isn't already set.
-				// Will make this neater in future
-
 				// Currently this will serve to only use SNS when there is no proxy setting
 				if len(proxyDest) == 0 {
 					proxyDest = destination
@@ -179,7 +216,7 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDBNew map[uint64]st
 
 				// Check internal Length
 				if (uint16(buf[offset+i+2])<<8 + uint16(buf[offset+i+3])) != (extLength - 2) {
-					log.Printf("Problem: Internal servername pointer length incorrect\n")
+					log.Printf("Problem: Internal elliptic curves pointer length incorrect\n")
 				}
 
 				ellipticCurvesLength := uint16(buf[offset+i+2])<<8 + uint16(buf[offset+i+3])
@@ -241,7 +278,8 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDBNew map[uint64]st
 
 		}
 
-		fingerprintName, fpExist := lookupFingerprint(thisFingerprint, fingerprintDBNew)
+		fingerprintName, fpExist, fpHashTmp := lookupFingerprint(thisFingerprint, fingerprintDBNew)
+		fpHash = fpHashTmp //  This is stupid, I should neaten this up
 		output.fingerprintName = fingerprintName
 
 		if fpExist {
@@ -269,5 +307,12 @@ func tlsFingerprint(buf []byte, proxyDest string, fingerprintDBNew map[uint64]st
 
 	}
 	//log.Printf("Ending tlsFingerprint function: %v", output)
-	return output, thisFingerprint
+	return output, thisFingerprint, fpHash
+}
+
+// invalidTLS is a function to perform standard actions on an invalidTLS packet.  This could
+// be because it is malformed, or simply mis-detected as TLS when it infact isn't, thus most
+// likely this will remain a logging function
+func invalidTLS(errorMsg string) {
+	log.Printf("Invalid TLS Packet: %s\n", errorMsg)
 }

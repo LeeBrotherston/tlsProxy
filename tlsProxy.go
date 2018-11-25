@@ -37,7 +37,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
 )
 
 // Fingerprints can totally be converted using jq -scM ''
@@ -56,22 +55,6 @@ var blocklist = map[string]bool{}
 var tempFPCounter int
 var globalConfig userConfig
 
-// Event structs are used to express events via the API
-type Event struct {
-	//EventID    [32]string `json:"event_id"`		// Generated serverside
-	Event     string    `json:"event"`
-	FPHash    string    `json:"fp_hash,omitempty"`
-	IPVersion string    `json:"ip_version"`
-	IPDst     string    `json:"ipv4_dst"`
-	IPSrc     string    `json:"ipv4_src"`
-	SrcPort   uint16    `json:"src_port"`
-	DstPort   uint16    `json:"dst_port"`
-	TimeStamp time.Time `json:"timestamp"`
-	//	TLSVersion  uint16    `json:"tls_version"`  // Part of the fingerprint, doesn't need to be stored here
-	SNI string `json:"server_name"`
-	//Fingerprint `json:"fingerprint,omitempty"`
-}
-
 // { "timestamp": "2016-08-09 15:09:08", "event": "fingerprint_match", "ip_version": "ipv6", "ipv6_src": "2607:fea8:705f:fd86::105a", "ipv6_dst": "2607:f8b0:400b:80b::2007", "src_port": 51948, "dst_port": 443, "tls_version": "TLSv1.2", "fingerprint_desc": "Chrome 51.0.2704.84 6", "server_name": "chatenabled.mail.google.com" }
 
 func main() {
@@ -84,6 +67,7 @@ func main() {
 	var sniff = flag.Bool("sniff", false, "Set true to use sniffing mode (default proxy)")
 	//var developer = flag.Bool("developer", false, "Runs certain unsafe modes for dev purposes... DO NOT USE IN PROD")
 	//var servername = flag.String("server", "127.0.0.1", "Which server to connect to")
+	//var useAPI = flag.Bool("api", true, "Use the API (as opposed to local only")
 	flag.Parse()
 
 	//print(murmur3.Sum128("arsearsearse"))

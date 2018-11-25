@@ -61,11 +61,11 @@ func addPrintNew(myPrint fingerprint, myDB map[uint64]string) {
 }
 
 // lookupFingerprint is used to lookup the name of a fingerprint given the JSON representation
-func lookupFingerprint(myPrint fingerprint, myDB map[uint64]string) (string, bool) {
+func lookupFingerprint(myPrint fingerprint, myDB map[uint64]string) (string, bool, uint64) {
 	myHash := hashPrint(myPrint)
 	fmt.Printf("Looking up hash: %v\n", myHash)
 	if value, ok := myDB[myHash]; ok {
-		return value, true
+		return value, true, myHash
 	}
-	return "", false
+	return "", false, myHash
 }

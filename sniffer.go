@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -30,7 +32,7 @@ func doSniff(device string, fingerprintDBNew map[uint64]string) {
 
 		// Locate the payload to send the the tlsFingerprint() function
 		payload := packet.ApplicationLayer()
-		fingerprintOutput, _ := tlsFingerprint(payload.Payload(), "", fingerprintDBNew)
+		fingerprintOutput, _, fpHash := tlsFingerprint(payload.Payload(), "", fingerprintDBNew)
 
 		// Populate an event struct
 		var event Event
@@ -55,7 +57,12 @@ func doSniff(device string, fingerprintDBNew map[uint64]string) {
 
 		event.Event = "log"
 
+		event.FPHash = strconv.FormatUint(fpHash, 16)
+
 		jsonOut, _ := json.Marshal(event)
+
+		fmt.Printf("Calling restPOST.....\n")
+		restPOST("http://127.0.0.1:8080/api/1/event/injest", jsonOut)
 
 		// Some output....
 		log.Printf("%s -> %s : %s : %s", src, dst, fingerprintOutput.fingerprintName, jsonOut)
