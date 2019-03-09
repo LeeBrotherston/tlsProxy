@@ -180,3 +180,10 @@ func main() {
 	}
 
 }
+
+// check is a (probably over) simple function to wrap errors that will always be fatal
+func check(e error) {
+	if e != nil {
+		panic(e)
+	}
+}
