@@ -19,6 +19,6 @@ run:
 	$(GOBUILD) -o $(BINARY_NAME) -v ./...
 	./$(BINARY_NAME)
 deps:
-	$(GOGET) -u ./...
+	$(GOGET) -v -u github.com/LeeBrotherston/dactyloscopy
 
 
