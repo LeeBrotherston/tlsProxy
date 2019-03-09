@@ -117,7 +117,7 @@ func main() {
 
 	// populate the fingerprintDB map
 	for k := range jsontype {
-		dactyloscopy.AddPrintNew(dactyloscopy.FpFiletoFP(jsontype[k]), fingerprintDBNew)
+		dactyloscopy.Add(dactyloscopy.Ftop(jsontype[k]), fingerprintDBNew)
 	}
 
 	log.Printf("Loaded %v fingerprints\n", len(jsontype))
