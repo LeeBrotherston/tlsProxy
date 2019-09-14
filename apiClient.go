@@ -59,6 +59,7 @@ func restPOST(endpoint string, buf []byte) {
 			fmt.Printf("Got a response\n")
 		} else {
 			fmt.Printf("No Response?\n")
+			// XXX Handle this
 		}
 		return
 	}

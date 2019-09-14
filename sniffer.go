@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 
+	"github.com/LeeBrotherston/dactyloscopy"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
@@ -32,7 +33,7 @@ func doSniff(device string, fingerprintDBNew map[uint64]string) {
 
 		// Locate the payload to send the the tlsFingerprint() function
 		payload := packet.ApplicationLayer()
-		fingerprintOutput, _, fpHash := tlsFingerprint(payload.Payload(), "", fingerprintDBNew)
+		fingerprintOutput, _, fpHash := dactyloscopy.TLSFingerprint(payload.Payload(), "", fingerprintDBNew)
 
 		// Populate an event struct
 		var event Event
@@ -53,7 +54,7 @@ func doSniff(device string, fingerprintDBNew map[uint64]string) {
 
 		event.IPVersion = src.EndpointType().String()
 
-		event.SNI = string(fingerprintOutput.hostname)
+		event.SNI = string(fingerprintOutput.Hostname)
 
 		event.Event = "log"
 
@@ -65,7 +66,7 @@ func doSniff(device string, fingerprintDBNew map[uint64]string) {
 		restPOST("http://127.0.0.1:8080/api/1/event/injest", jsonOut)
 
 		// Some output....
-		log.Printf("%s -> %s : %s : %s", src, dst, fingerprintOutput.fingerprintName, jsonOut)
+		log.Printf("%s -> %s : %s : %s", src, dst, fingerprintOutput.FingerprintName, jsonOut)
 	}
 
 }

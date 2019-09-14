@@ -37,6 +37,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+
+	"github.com/LeeBrotherston/dactyloscopy"
 )
 
 // Fingerprints can totally be converted using jq -scM ''
@@ -52,7 +54,7 @@ var developer bool
 var blocklist = map[string]bool{}
 
 // Global counter for new fingerprints
-var tempFPCounter int
+//var tempFPCounter int
 var globalConfig userConfig
 
 // { "timestamp": "2016-08-09 15:09:08", "event": "fingerprint_match", "ip_version": "ipv6", "ipv6_src": "2607:fea8:705f:fd86::105a", "ipv6_dst": "2607:f8b0:400b:80b::2007", "src_port": 51948, "dst_port": 443, "tls_version": "TLSv1.2", "fingerprint_desc": "Chrome 51.0.2704.84 6", "server_name": "chatenabled.mail.google.com" }
@@ -103,7 +105,7 @@ func main() {
 	}
 
 	// Parse that JSON file
-	var jsontype []fingerprintFile
+	var jsontype []dactyloscopy.FingerprintFile
 	err = json.Unmarshal(file, &jsontype)
 	if err != nil {
 		log.Fatalf("JSON error: %v", err)
@@ -115,7 +117,7 @@ func main() {
 
 	// populate the fingerprintDB map
 	for k := range jsontype {
-		addPrintNew(fpFiletoFP(jsontype[k]), fingerprintDBNew)
+		dactyloscopy.Add(dactyloscopy.Ftop(jsontype[k]), fingerprintDBNew)
 	}
 
 	log.Printf("Loaded %v fingerprints\n", len(jsontype))
@@ -136,7 +138,7 @@ func main() {
 	}
 
 	// Set temp FP counter past the number of FP's ... maybe ?!
-	tempFPCounter = int(len(jsontype)) + 1
+	//tempFPCounter = int(len(jsontype)) + 1
 
 	// Open event log and set as output
 	globalConfig.apFile, err = os.OpenFile(globalConfig.AppLog, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
@@ -177,4 +179,11 @@ func main() {
 
 	}
 
+}
+
+// check is a (probably over) simple function to wrap errors that will always be fatal
+func check(e error) {
+	if e != nil {
+		panic(e)
+	}
 }

@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	dactyloscopy "github.com/LeeBrotherston/dactyloscopy"
 )
 
 // forward handles an individual connection
@@ -138,9 +140,10 @@ func forward(conn net.Conn, fingerprintDBNew map[uint64]string) {
 
 		} else if buf[0] == 22 && buf[5] == 1 && buf[1] == 3 && buf[9] == 3 {
 			log.Printf("About to call tlsFingerprint")
-			fingerprintOutput, _, _ := tlsFingerprint(buf, proxyDest, fingerprintDBNew)
+			fingerprintOutput, _, _ := dactyloscopy.TLSFingerprint(buf, proxyDest, fingerprintDBNew)
 			log.Printf("Fingerptintoutoutoutout: %v", fingerprintOutput)
-			destination = fingerprintOutput.destination
+			destination = fingerprintOutput.Destination
+
 			chLen = uint16(buf[3])<<8 + uint16(buf[4])
 			// Check if the host is in the blocklist or not...
 			t := time.Now()
@@ -148,13 +151,13 @@ func forward(conn net.Conn, fingerprintDBNew map[uint64]string) {
 			_, ok := blocklist[hostname]
 			if ok == true {
 				log.Printf("%v is on the blocklist!  DROPPING!\n", hostname)
-				fmt.Fprintf(globalConfig.eventFile, "{ \"timestamp\": \"%v\", \"event\": \"block\", \"fingerprint_desc\": \"%v\", \"server_name\": \"%v\" }\n", t.Format(time.RFC3339), fingerprintOutput.fingerprintName, hostname)
+				fmt.Fprintf(globalConfig.eventFile, "{ \"timestamp\": \"%v\", \"event\": \"block\", \"fingerprint_desc\": \"%v\", \"server_name\": \"%v\" }\n", t.Format(time.RFC3339), fingerprintOutput.FingerprintName, hostname)
 				conn.Close()
 			} else {
 				// Not on the blocklist - woo!
 				// XXX DO THIS!
 				log.Printf("%v is *not* on the blocklist.  Permitting\n", hostname)
-				fmt.Fprintf(globalConfig.eventFile, "{ \"timestamp\": \"%v\", \"event\": \"permit\", \"fingerprint_desc\": \"%v\", \"server_name\": \"%v\" }\n", t.Format(time.RFC3339), fingerprintOutput.fingerprintName, hostname)
+				fmt.Fprintf(globalConfig.eventFile, "{ \"timestamp\": \"%v\", \"event\": \"permit\", \"fingerprint_desc\": \"%v\", \"server_name\": \"%v\" }\n", t.Format(time.RFC3339), fingerprintOutput.FingerprintName, hostname)
 			}
 
 		} else {
